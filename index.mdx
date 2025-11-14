@@ -7,9 +7,11 @@ description: Universal code execution backend for LLMs with dynamic tool discove
 
 **Fast, capable, and intelligent code execution for LLM agents.**
 
-Code-Exec enables LLMs to execute code in **two optimized paths**:
-- **JavaScript in Isolates** (~10ms startup) - Virtual filesystem, fast MCP orchestration
-- **TypeScript/Python/Shell in Containers** (~200ms startup) - Real filesystem, full language support
+Code-Exec enables LLMs to execute code in **four runtimes with FULL MCP parity**:
+- **JavaScript** (~10ms) - V8 isolates, MCP via RPC loopback ✅
+- **TypeScript** (~200ms) - Containers, MCP via HTTP bridge ✅
+- **Python** (~200ms) - Containers, MCP via HTTP bridge ✅
+- **Shell** (~200ms) - Containers, filesystem discovery ✅
 
 <CardGroup cols={2}>
   <Card

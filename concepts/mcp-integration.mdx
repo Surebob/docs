@@ -9,8 +9,8 @@ Code-Exec enables LLMs to call **Model Context Protocol (MCP) tools** from their
 
 <Info>
 **MCP Status**:
-- **Isolates**: ✅ Working via RPC loopback
-- **Containers**: ⚠️ Not yet implemented (needs HTTP bridge)
+- **Isolates**: ✅ Working via RPC loopback (`ctx.exports`)
+- **Containers**: ✅ Working via HTTP bridge to Durable Object!
 </Info>
 
 ## How It Works (Isolates)
@@ -221,21 +221,67 @@ try {
 }
 ```
 
-## Containers (Future)
+## Containers (HTTP Bridge)
 
-<Warning>
-**MCP calls from containers not yet implemented.**
+<Check>
+**MCP calls from containers FULLY WORKING!**
 
-Containers need an HTTP bridge back to the parent Worker.
+Containers use HTTP bridge to Worker's `/__mcp_rpc` endpoint, which uses `ctx.exports` for RPC loopback.
+</Check>
 
-For now, **use isolates (JavaScript runtime) for MCP tool calls**.
-</Warning>
+### Architecture
 
-**Planned implementation:**
-1. Parent Worker runs HTTP server
-2. Container makes HTTP requests to parent
-3. Parent proxies to real MCP servers
-4. Results flow back through HTTP
+```
+Container Code → host.docker.internal:8787/__mcp_rpc 
+  → Worker uses ctx.exports.MCPProxy() 
+  → Real MCP Server
+```
+
+**Worker Endpoint:**
+```typescript
+// Main Worker endpoint
+if (path === '/__mcp_rpc' && request.method === 'POST') {
+  const { userId, serverName, toolName, input } = await request.json();
+  
+  // Use ctx.exports to call MCPProxy entrypoint (RPC loopback)
+  const result = await ctx.exports.MCPProxy({ 
+    props: { userId, isOwner: true } 
+  }).callTool(serverName, toolName, input);
+  
+  return Response.json({ success: true, result });
+}
+```
+
+**Container Wrapper:**
+```typescript
+// Injected into every container execution
+globalThis.__mcpCall = async (serverName, toolName, input) => {
+  const response = await fetch('http://host.docker.internal:8787/__mcp_rpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, serverName, toolName, input })
+  });
+  
+  const data = await response.json();
+  if (data.error) throw new Error(data.error);
+  return data.result;
+};
+```
+
+**Generated Tool (works in both isolates and containers!):**
+```typescript
+export async function searchEmails(input) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+### Why This Works
+
+1. **`host.docker.internal`** - Containers can reach the host Worker from inside Docker
+2. **`ctx.exports`** - Workers can call their own exported entrypoints via RPC loopback
+3. **No SDK patching** - Clean HTTP bridge, production ready!
+
+**LLM just imports and calls - completely transparent across all runtimes!**
 
 ## Next Steps
 
