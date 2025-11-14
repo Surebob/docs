@@ -1,7 +1,7 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "quill",
-  "name": "Code-Exec",
+  "theme": "almond",
+  "name": "Universal Agent Code Execution",
   "colors": {
     "primary": "#9333EA",
     "light": "#A855F7",
@@ -28,15 +28,6 @@
               "concepts/virtual-filesystem",
               "concepts/tool-discovery",
               "concepts/mcp-integration"
-            ]
-          },
-          {
-            "group": "Guides",
-            "pages": [
-              "guides/isolate-execution",
-              "guides/container-execution",
-              "guides/mcp-tools",
-              "guides/error-handling"
             ]
           }
         ]
@@ -66,10 +57,7 @@
           {
             "group": "Test Suites",
             "pages": [
-              "testing/overview",
-              "testing/isolate-tests",
-              "testing/typescript-tests",
-              "testing/python-tests"
+              "testing/overview"
             ]
           }
         ]
