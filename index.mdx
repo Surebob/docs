@@ -1,97 +1,118 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: Code-Exec
+description: Universal code execution backend for LLMs with dynamic tool discovery
 ---
 
-## Setting up
+# Welcome to Code-Exec
 
-Get your documentation site up and running in minutes.
+**Fast, capable, and intelligent code execution for LLM agents.**
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
+Code-Exec enables LLMs to execute code in **two optimized paths**:
+- **JavaScript in Isolates** (~10ms startup) - Virtual filesystem, fast MCP orchestration
+- **TypeScript/Python/Shell in Containers** (~200ms startup) - Real filesystem, full language support
 
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
+<CardGroup cols={2}>
   <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
+    title="Quick Start"
+    icon="rocket"
+    href="/quickstart"
   >
-    Edit your docs locally and preview them in real time.
+    Get up and running in 5 minutes
   </Card>
   <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
+    title="Architecture"
+    icon="sitemap"
+    href="/architecture"
   >
-    Customize the design and colors of your site to match your brand.
-  </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+    Understand the dual-path execution model
   </Card>
   <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
-  </Card>
-</Columns>
-
-## Create beautiful pages
-
-Everything you need to create world-class documentation.
-
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
+    title="API Reference"
     icon="code"
-    href="/essentials/code"
+    href="/api/execute"
   >
-    Add sample code to demonstrate how to use your product.
+    Execute code via HTTP API
   </Card>
   <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
+    title="Testing"
+    icon="flask"
+    href="/testing/overview"
   >
-    Display images and other media.
+    30 comprehensive tests validating all features
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+</CardGroup>
 
-## Need inspiration?
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Dynamic Tool Discovery">
+    LLMs can explore `/mnt/servers/` to discover available MCP tools at runtime. No need to enumerate tools in prompts!
+    
+    ```javascript
+    import fs from 'node:fs';
+    const tools = fs.readdirSync('/mnt/servers/cosmo-tools');
+    // → Discovers 42 tools dynamically!
+    ```
+  </Accordion>
+
+  <Accordion title="Virtual Filesystem (Isolates)">
+    Custom `node:fs` module provides in-memory filesystem for V8 isolates. LLMs write natural code!
+    
+    ```javascript
+    import fs from 'node:fs';
+    const servers = fs.readdirSync('/mnt/servers');
+    const code = fs.readFileSync('/mnt/servers/cosmo-tools/searchEmails.js');
+    ```
+  </Accordion>
+
+  <Accordion title="Multi-Language Support">
+    Execute JavaScript, TypeScript, Python, or Shell:
+    
+    - **JavaScript**: Isolates (~10ms)
+    - **TypeScript**: Containers with bun (~200ms)
+    - **Python**: Containers with python3 (~200ms)
+    - **Shell**: Containers with bash (~200ms)
+  </Accordion>
+
+  <Accordion title="MCP Integration">
+    Call Model Context Protocol tools via RPC loopback:
+    
+    ```javascript
+    import { searchEmails } from '/mnt/servers/cosmo-tools/searchEmails.js';
+    const results = await searchEmails({ query: "is:unread" });
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Performance
+
+| Runtime | Sandbox | Startup | Total | Use Case |
+|---------|---------|---------|-------|----------|
+| JavaScript | Isolate | ~10ms | ~120ms | Fast MCP orchestration |
+| TypeScript | Container | ~200ms | ~2000ms | Types, file operations |
+| Python | Container | ~200ms | ~2000ms | Data analysis |
+
+## Architecture Overview
+
+```mermaid
+graph TD
+    A[LLM Request] --> B{Runtime?}
+    B -->|javascript| C[Isolate ~10ms]
+    B -->|typescript/python/shell| D[Container ~200ms]
+    C --> E[Virtual node:fs]
+    D --> F[Real Filesystem]
+    E --> G[MCP Tools .js]
+    F --> H[MCP Tools .ts]
+    G --> I[Execute & Return]
+    H --> I
+```
+
+## Ready to Start?
 
 <Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
+  title="Quickstart Guide"
+  icon="play"
+  href="/quickstart"
 >
-  Browse our showcase of exceptional documentation sites.
+  Execute your first code in 2 minutes
 </Card>

@@ -1,0 +1,245 @@
+---
+title: MCP Integration
+description: How Code-Exec integrates with Model Context Protocol servers
+---
+
+## Overview
+
+Code-Exec enables LLMs to call **Model Context Protocol (MCP) tools** from their generated code using natural imports.
+
+<Info>
+**MCP Status**:
+- **Isolates**: ✅ Working via RPC loopback
+- **Containers**: ⚠️ Not yet implemented (needs HTTP bridge)
+</Info>
+
+## How It Works (Isolates)
+
+### 1. Tool Generation
+
+MCP server schemas are converted to JavaScript modules:
+
+```javascript
+// Generated: /mnt/servers/cosmo-tools/searchEmails.js
+import { __mcpCall } from '../_client.js';
+
+/**
+ * @param {Object} input
+ * @param {string} input.query Gmail search query
+ */
+export async function searchEmails(input) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+### 2. MCP Client Runtime
+
+A `_client.js` file provides the `__mcpCall` function:
+
+```javascript
+// /mnt/servers/_client.js
+export async function __mcpCall(serverName, toolName, input) {
+  return await globalThis.__mcpCall(serverName, toolName, input);
+}
+```
+
+### 3. Global Injection
+
+The wrapper code injects the actual MCP proxy:
+
+```javascript
+globalThis.__mcpCall = async (serverName, toolName, input) => {
+  return await env.MCP.callTool(serverName, toolName, input);
+};
+```
+
+### 4. RPC Loopback
+
+The `env.MCP` binding uses `ctx.exports` for RPC back to parent:
+
+```typescript
+// Parent Worker
+export class MCPProxy extends WorkerEntrypoint {
+  async callTool(serverName: string, toolName: string, input: any) {
+    return await mcpRegistry.callTool(serverName, toolName, input, {
+      userId: this.ctx.props.userId,
+      isOwner: this.ctx.props.isOwner
+    });
+  }
+}
+
+// Isolate gets it
+env.MCP = ctx.exports.MCPProxy({ 
+  props: { userId, isOwner: true } 
+});
+```
+
+## Call Flow
+
+```mermaid
+sequenceDiagram
+    participant LLM as LLM Code
+    participant Tool as searchEmails()
+    participant Global as __mcpCall()
+    participant RPC as env.MCP
+    participant Parent as Parent Worker
+    participant Server as MCP Server
+
+    LLM->>Tool: searchEmails({query: "test"})
+    Tool->>Global: __mcpCall('cosmo-tools', 'searchEmails', ...)
+    Global->>RPC: env.MCP.callTool(...)
+    RPC->>Parent: MCPProxy.callTool() [RPC]
+    Parent->>Server: HTTP to real MCP server
+    Server-->>Parent: Result
+    Parent-->>RPC: Result
+    RPC-->>Global: Result
+    Global-->>Tool: Result
+    Tool-->>LLM: Result
+```
+
+## Usage Example
+
+```javascript
+import fs from 'node:fs';
+
+// Discover available email tools
+const tools = fs.readdirSync('/mnt/servers/cosmo-tools')
+  .filter(f => f.includes('email') || f.includes('Email'));
+
+console.log('Email tools:', tools);
+// → ['searchEmails.js', 'getEmail.js', 'sendEmail.js', ...]
+
+// Import and use
+import { searchEmails } from '/mnt/servers/cosmo-tools/searchEmails.js';
+import { sendSMS } from '/mnt/servers/cosmo-tools/sendSMS.js';
+
+// Call multiple MCP tools in one execution
+const emails = await searchEmails({ 
+  query: 'is:unread', 
+  maxResults: 1 
+});
+
+if (emails.length > 0) {
+  await sendSMS({ 
+    to: '+1234567890', 
+    message: `You have ${emails.length} unread emails` 
+  });
+}
+
+console.log('Notification sent!');
+```
+
+## MCP Server Configuration
+
+MCP servers are configured via environment variable:
+
+```json
+MCP_SERVERS=[
+  {
+    "name": "cosmo-tools",
+    "url": "https://cosmo-mcp-server.example.com",
+    "credentials": {
+      "type": "bearer",
+      "token": "secret-token"
+    }
+  }
+]
+```
+
+**Security**: API tokens are **never exposed to the isolate**. All calls are proxied through the parent Worker.
+
+## Tool Schema Example
+
+**MCP Server Response:**
+```json
+{
+  "tools": [
+    {
+      "name": "searchEmails",
+      "description": "Search Gmail inbox",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Gmail search query"
+          },
+          "maxResults": {
+            "type": "number",
+            "description": "Max results"
+          }
+        },
+        "required": ["query"]
+      }
+    }
+  ]
+}
+```
+
+**Generated JavaScript (Isolate):**
+```javascript
+/**
+ * Search Gmail inbox
+ */
+/**
+ * @param {Object} input
+ * @param {string} input.query Gmail search query
+ * @param {number}? input.maxResults Max results
+ */
+export async function searchEmails(input) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+**Generated TypeScript (Container):**
+```typescript
+export interface SearchEmailsInput {
+  /** Gmail search query */
+  query: string;
+  /** Max results */
+  maxResults?: number;
+}
+
+/**
+ * Search Gmail inbox
+ */
+export async function searchEmails(input: SearchEmailsInput) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+## Error Handling
+
+MCP calls can fail - the LLM receives full error details:
+
+```javascript
+try {
+  const result = await searchEmails({ query: 'invalid' });
+} catch (error) {
+  console.log('MCP call failed:', error.message);
+  // Error details returned to LLM
+}
+```
+
+## Containers (Future)
+
+<Warning>
+**MCP calls from containers not yet implemented.**
+
+Containers need an HTTP bridge back to the parent Worker.
+
+For now, **use isolates (JavaScript runtime) for MCP tool calls**.
+</Warning>
+
+**Planned implementation:**
+1. Parent Worker runs HTTP server
+2. Container makes HTTP requests to parent
+3. Parent proxies to real MCP servers
+4. Results flow back through HTTP
+
+## Next Steps
+
+<Card title="Error Handling" href="/guides/error-handling">
+  Learn how errors are reported to LLMs
+</Card>
+

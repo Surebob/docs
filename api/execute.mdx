@@ -1,0 +1,208 @@
+---
+title: POST /api/execute
+description: Execute code in isolates or containers
+---
+
+## Endpoint
+
+```
+POST http://localhost:8787/api/execute
+```
+
+## Request Body
+
+<ParamField path="userId" type="string" required>
+  User identifier for multi-tenancy and R2 storage
+</ParamField>
+
+<ParamField path="code" type="string" required>
+  Code to execute (JavaScript, TypeScript, Python, or Shell)
+</ParamField>
+
+<ParamField path="runtime" type="string" required>
+  Execution runtime
+  
+  **Options:**
+  - `javascript` - Isolate (~10ms startup)
+  - `typescript` - Container (~200ms startup)
+  - `python` - Container (~200ms startup)
+  - `shell` - Container (~200ms startup)
+</ParamField>
+
+## Response
+
+<ResponseField name="success" type="boolean">
+  Whether execution succeeded
+</ResponseField>
+
+<ResponseField name="output" type="string">
+  Combined stdout output
+</ResponseField>
+
+<ResponseField name="logs" type="string[]">
+  Array of console.log outputs
+</ResponseField>
+
+<ResponseField name="duration" type="number">
+  Execution time in milliseconds
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Error details if execution failed
+  
+  <Expandable title="Error Object">
+    <ResponseField name="type" type="string">
+      Error type: `runtime`, `validation`, `timeout`
+    </ResponseField>
+    
+    <ResponseField name="message" type="string">
+      Error message with stack trace
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="skillsSaved" type="string[]">
+  Names of skills saved during execution
+</ResponseField>
+
+<ResponseField name="filesystemChanged" type="boolean">
+  Whether filesystem was modified
+</ResponseField>
+
+## Examples
+
+### JavaScript (Isolate)
+
+<CodeGroup>
+
+```bash cURL
+curl -X POST http://localhost:8787/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "test-user",
+    "code": "import fs from '\''node:fs'\''; const tools = fs.readdirSync('\''/mnt/servers/cosmo-tools'\''); console.log('\''Found:\ '', tools.length);",
+    "runtime": "javascript"
+  }'
+```
+
+```javascript JavaScript
+const response = await fetch('http://localhost:8787/api/execute', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    userId: 'test-user',
+    code: `
+      import fs from 'node:fs';
+      const tools = fs.readdirSync('/mnt/servers/cosmo-tools');
+      console.log('Found:', tools.length);
+    `,
+    runtime: 'javascript'
+  })
+});
+
+const result = await response.json();
+```
+
+</CodeGroup>
+
+**Response:**
+```json
+{
+  "success": true,
+  "output": "Found: 42",
+  "logs": ["Found: 42"],
+  "duration": 120,
+  "skillsSaved": [],
+  "filesystemChanged": false
+}
+```
+
+### TypeScript (Container)
+
+```bash
+curl -X POST http://localhost:8787/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "test-user",
+    "code": "interface User { name: string; } const user: User = { name: \"Test\" }; console.log(user.name);",
+    "runtime": "typescript"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "output": "Test",
+  "logs": ["Test"],
+  "duration": 2100,
+  "skillsSaved": [],
+  "filesystemChanged": false
+}
+```
+
+### Python (Container)
+
+```bash
+curl -X POST http://localhost:8787/api/execute \
+  -H "Content-Type: application/json" \
+  -d '{
+    "userId": "test-user",
+    "code": "import os\\ntools = os.listdir('\''/mnt/servers/cosmo-tools'\'')\\nprint(f'\''Found {len(tools)} tools'\'')",
+    "runtime": "python"
+  }'
+```
+
+**Response:**
+```json
+{
+  "success": true,
+  "output": "Found 42 tools",
+  "logs": ["Found 42 tools"],
+  "duration": 1950,
+  "skillsSaved": [],
+  "filesystemChanged": false
+}
+```
+
+## Error Responses
+
+### Runtime Error
+
+```json
+{
+  "success": false,
+  "output": "",
+  "logs": [],
+  "error": {
+    "type": "runtime",
+    "message": "ReferenceError: undefined variable\n  at main.js:10:5"
+  },
+  "duration": 85
+}
+```
+
+### Invalid Runtime
+
+```json
+{
+  "success": false,
+  "error": "Invalid runtime. Must be one of: javascript, typescript, python, shell"
+}
+```
+
+## Performance
+
+| Runtime | Cold Start | Warm | Typical Total |
+|---------|------------|------|---------------|
+| JavaScript | ~10ms | ~10ms | ~120ms |
+| TypeScript | ~200ms | ~200ms | ~2000ms |
+| Python | ~200ms | ~200ms | ~2000ms |
+| Shell | ~200ms | ~200ms | ~300ms |
+
+<Tip>
+Use `javascript` runtime for fast MCP orchestration (~10ms startup)
+
+Use `typescript` for type safety and file operations (~200ms startup)
+</Tip>
+

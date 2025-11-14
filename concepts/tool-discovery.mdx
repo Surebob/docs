@@ -1,0 +1,271 @@
+---
+title: Tool Discovery
+description: How LLMs dynamically discover available MCP tools
+---
+
+## Dynamic Discovery
+
+LLMs can **explore the filesystem** to discover tools, rather than being told about them:
+
+<CodeGroup>
+
+```javascript JavaScript (Isolate)
+import fs from 'node:fs';
+
+// Discover servers
+const servers = fs.readdirSync('/mnt/servers');
+console.log('Servers:', servers);
+// → ['cosmo-tools']
+
+// Discover tools
+const tools = fs.readdirSync('/mnt/servers/cosmo-tools');
+console.log('Tools:', tools.length);
+// → 42 tools
+
+// Read documentation
+const code = fs.readFileSync('/mnt/servers/cosmo-tools/searchEmails.js', 'utf-8');
+// Parse JSDoc to understand parameters
+```
+
+```typescript TypeScript (Container)
+import fs from 'fs';
+
+// Discover with type checking
+const servers = fs.readdirSync('/mnt/servers')
+  .filter(s => {
+    const stats = fs.statSync(`/mnt/servers/${s}`);
+    return stats.isDirectory();
+  });
+
+console.log('Found servers:', servers);
+```
+
+```python Python (Container)
+import os
+
+# Discover using Python
+servers = [s for s in os.listdir('/mnt/servers') 
+           if os.path.isdir(os.path.join('/mnt/servers', s))]
+
+tools = [f.replace('.ts', '') 
+         for f in os.listdir('/mnt/servers/cosmo-tools')
+         if f.endswith('.ts')]
+
+print(f'Found {len(tools)} tools')
+```
+
+</CodeGroup>
+
+## Filesystem Structure
+
+```
+/mnt/servers/
+├── cosmo-tools/           # MCP server
+│   ├── searchEmails.js    # Tool (isolates)
+│   ├── searchEmails.ts    # Tool (containers)
+│   ├── getEmail.js
+│   ├── getEmail.ts
+│   └── ...42 tools
+├── _client.js             # MCP client runtime
+└── _client.ts
+```
+
+<Info>
+**Smart Generation**: `.js` files for isolates, `.ts` files for containers!
+</Info>
+
+## Reading Tool Documentation
+
+### JavaScript Tools (Isolates)
+
+Generated files include **JSDoc** for parameter documentation:
+
+```javascript
+// searchEmails.js
+import { __mcpCall } from '../_client.js';
+
+/**
+ * Search user's Gmail inbox
+ */
+/**
+ * @param {Object} input
+ * @param {string} input.query Gmail search query
+ * @param {number}? input.maxResults Max results (optional)
+ */
+export async function searchEmails(input) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+**LLMs can parse JSDoc** to understand parameters!
+
+### TypeScript Tools (Containers)
+
+Generated files include **full TypeScript interfaces**:
+
+```typescript
+// searchEmails.ts
+import { __mcpCall } from '../_client.js';
+
+export interface SearchEmailsInput {
+  /** Gmail search query */
+  query: string;
+  /** Max results (optional) */
+  maxResults?: number;
+}
+
+/**
+ * Search user's Gmail inbox
+ */
+export async function searchEmails(input: SearchEmailsInput) {
+  return __mcpCall('cosmo-tools', 'searchEmails', input);
+}
+```
+
+**LLMs can read interfaces** to understand types!
+
+## Discovery Workflow
+
+<Steps>
+  <Step title="List Servers">
+    ```javascript
+    const servers = fs.readdirSync('/mnt/servers');
+    // Filter out helper files
+    const actualServers = servers.filter(s => !s.startsWith('_') && !s.endsWith('.js'));
+    ```
+  </Step>
+
+  <Step title="Explore Tools">
+    ```javascript
+    for (const server of actualServers) {
+      const tools = fs.readdirSync(`/mnt/servers/${server}`);
+      const toolNames = tools
+        .filter(f => f.endsWith('.js') && f !== 'index.js')
+        .map(f => f.replace('.js', ''));
+      console.log(`${server}: ${toolNames.length} tools`);
+    }
+    ```
+  </Step>
+
+  <Step title="Read Documentation">
+    ```javascript
+    const code = fs.readFileSync('/mnt/servers/cosmo-tools/searchEmails.js', 'utf-8');
+    
+    // Extract JSDoc
+    const jsdoc = code.match(/\/\*\*[\s\S]*?\*\//g);
+    
+    // Extract parameters
+    const params = code.match(/@param \{([^}]+)\}(\?)? input\.(\w+)/g);
+    ```
+  </Step>
+
+  <Step title="Import and Use">
+    ```javascript
+    import { searchEmails } from '/mnt/servers/cosmo-tools/searchEmails.js';
+    
+    const results = await searchEmails({ 
+      query: "is:unread",
+      maxResults: 10
+    });
+    ```
+  </Step>
+</Steps>
+
+## Benefits
+
+<CardGroup cols={2}>
+  <Card title="Token Efficiency" icon="coins">
+    No need to send full tool schemas
+    
+    LLM discovers what it needs
+  </Card>
+  
+  <Card title="Natural Code" icon="code">
+    LLMs write standard JavaScript
+    
+    No special syntax required
+  </Card>
+  
+  <Card title="Self-Documenting" icon="book">
+    JSDoc and interfaces embedded
+    
+    LLM reads to understand
+  </Card>
+  
+  <Card title="Scalable" icon="chart-line">
+    Add tools without updating prompts
+    
+    Discovery handles it
+  </Card>
+</CardGroup>
+
+## Test Results
+
+Our comprehensive test suites validate tool discovery:
+
+**Isolate Test:**
+```
+✅ Discovered 1 server (cosmo-tools)
+✅ Found 42 tools
+✅ Read and parsed JSDoc
+✅ Extracted parameters
+```
+
+**Container TypeScript Test:**
+```
+✅ Discovered 1 server
+✅ Found 42 tools (.ts files)
+✅ Read TypeScript interfaces
+✅ Parsed type annotations
+```
+
+**Container Python Test:**
+```
+✅ Discovered 1 server
+✅ Found 42 tools
+✅ Read and parsed with regex
+✅ Extracted function names
+```
+
+## Example: Complete Discovery
+
+```javascript
+import fs from 'node:fs';
+
+// Step 1: Find all servers
+const servers = fs.readdirSync('/mnt/servers')
+  .filter(s => !s.startsWith('_') && !s.endsWith('.js'));
+
+console.log(`Found ${servers.length} MCP servers`);
+
+// Step 2: Map tools by server
+const toolMap = {};
+for (const server of servers) {
+  const files = fs.readdirSync(`/mnt/servers/${server}`);
+  const tools = files
+    .filter(f => f.endsWith('.js') && f !== 'index.js')
+    .map(f => f.replace('.js', ''));
+  toolMap[server] = tools;
+}
+
+// Step 3: Read a tool's code
+const toolPath = '/mnt/servers/cosmo-tools/searchEmails.js';
+const toolCode = fs.readFileSync(toolPath, 'utf-8');
+
+// Step 4: Parse JSDoc
+const jsdocMatch = toolCode.match(/\/\*\*[\s\S]*?\*\//);
+const params = toolCode.matchAll(/@param \{([^}]+)\}(\?)? input\.(\w+)/g);
+
+console.log('Tool parameters:');
+for (const match of params) {
+  const [, type, optional, name] = match;
+  console.log(`  - ${name}: ${type} ${optional ? '(optional)' : '(required)'}`);
+}
+```
+
+## Next Steps
+
+<Card title="MCP Integration" href="/concepts/mcp-integration">
+  Learn how to call discovered tools
+</Card>
+

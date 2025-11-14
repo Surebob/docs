@@ -1,0 +1,151 @@
+---
+title: execute_javascript
+description: MCP tool for fast JavaScript execution in V8 isolates
+---
+
+## Overview
+
+Execute JavaScript in V8 isolate with **virtual filesystem** and **MCP tool discovery**.
+
+<Info>
+**Performance**: ~10ms startup, ~100ms total execution
+
+**Best for**: Fast MCP orchestration, quick calculations
+</Info>
+
+## Tool Definition
+
+```json
+{
+  "name": "execute_javascript",
+  "description": "Execute JavaScript in V8 isolate (~10ms startup, ~100ms total). Virtual filesystem, can discover MCP tools dynamically. FASTEST option.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "code": {
+        "type": "string",
+        "description": "JavaScript code (ES6+). Can import from 'node:fs' (virtual). Can discover tools via fs.readdirSync('/mnt/servers/cosmo-tools'). No TypeScript types allowed."
+      }
+    },
+    "required": ["code"]
+  }
+}
+```
+
+## Parameters
+
+<ParamField path="code" type="string" required>
+  JavaScript code to execute (ES6+ syntax)
+  
+  **Can:**
+  - Import `node:fs` for tool discovery
+  - Import MCP tools from `/mnt/servers/`
+  - Use async/await
+  - Chain multiple MCP calls
+  
+  **Cannot:**
+  - Use TypeScript syntax (`interface`, `type`)
+  - Save files (virtual fs is read-only)
+  - Run Python or shell
+</ParamField>
+
+## Response
+
+Returns execution result with logs and any errors.
+
+## Examples
+
+### Basic Execution
+
+```javascript
+console.log('Hello from isolate!');
+console.log('2 + 2 =', 2 + 2);
+```
+
+### Tool Discovery
+
+```javascript
+import fs from 'node:fs';
+
+const servers = fs.readdirSync('/mnt/servers');
+console.log('MCP servers:', servers);
+
+const tools = fs.readdirSync('/mnt/servers/cosmo-tools');
+console.log('Available tools:', tools.length);
+```
+
+### MCP Tool Call
+
+```javascript
+import { searchEmails } from '/mnt/servers/cosmo-tools/searchEmails.js';
+
+const emails = await searchEmails({ 
+  query: 'is:unread', 
+  maxResults: 5 
+});
+
+console.log('Found', emails.length, 'unread emails');
+```
+
+### Multiple Tool Calls
+
+```javascript
+import { searchEmails } from '/mnt/servers/cosmo-tools/searchEmails.js';
+import { sendSMS } from '/mnt/servers/cosmo-tools/sendSMS.js';
+
+const emails = await searchEmails({ query: 'is:unread', maxResults: 1 });
+
+if (emails.length > 0) {
+  await sendSMS({ 
+    to: '+1234567890', 
+    message: 'You have new email!' 
+  });
+}
+```
+
+## Capabilities
+
+<Check>**Supported:**</Check>
+- Virtual `node:fs` module
+- ES6+ JavaScript
+- Async/await
+- Dynamic imports
+- Array methods (map, filter, reduce)
+- JSON manipulation
+- MCP tool calls via RPC
+
+<Warning>**Not Supported:**</Warning>
+- TypeScript syntax
+- File writes (read-only filesystem)
+- Python or shell
+- npm packages
+
+## Performance
+
+**Measured Results:**
+- Startup: ~10ms
+- Simple execution: ~50-100ms
+- With MCP calls: ~100-300ms (depends on MCP server)
+
+**10/10 comprehensive tests pass** ✅
+
+## When to Use
+
+**Choose `execute_javascript` when:**
+- Speed is critical
+- Pure JavaScript is sufficient
+- Quick MCP tool orchestration
+- Don't need TypeScript types
+
+**Choose `execute_code` (TypeScript) when:**
+- Need TypeScript interfaces
+- Need to save skills
+- Need file operations
+- Default for most tasks
+
+## Related
+
+<Card title="execute_code" href="/api/tools/execute-code">
+  TypeScript/Python/Shell execution in containers
+</Card>
+

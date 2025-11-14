@@ -1,0 +1,59 @@
+---
+title: GET /health
+description: Health check endpoint
+---
+
+## Endpoint
+
+```
+GET http://localhost:8787/health
+```
+
+## Response
+
+<ResponseField name="status" type="string">
+  Health status (always "ok" if responding)
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Current backend version
+</ResponseField>
+
+<ResponseField name="environment" type="string">
+  Environment: `development` or `production`
+</ResponseField>
+
+<ResponseField name="timestamp" type="string">
+  ISO 8601 timestamp
+</ResponseField>
+
+## Example
+
+```bash cURL
+curl http://localhost:8787/health
+```
+
+**Response:**
+```json
+{
+  "status": "ok",
+  "version": "3.0.0",
+  "environment": "development",
+  "timestamp": "2025-11-14T12:34:56.789Z"
+}
+```
+
+## Use Cases
+
+<CardGroup>
+  <Card title="Monitoring" icon="heartbeat">
+    Check if backend is responsive
+  </Card>
+  <Card title="CI/CD" icon="gear">
+    Verify deployment succeeded
+  </Card>
+  <Card title="Load Balancing" icon="scale-balanced">
+    Health check for load balancers
+  </Card>
+</CardGroup>
+
